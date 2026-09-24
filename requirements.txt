@@ -1,0 +1,21 @@
+# Core PDF reading and document extraction
+pypdf
+
+# Local embeddings model (Hugging Face sentence-transformers runs on CPU without API keys)
+sentence-transformers
+
+# Vector search index for retrieving relevant chunks
+faiss-cpu
+
+# Orchestration and chunking utilities
+langchain
+langchain-community
+
+# LLM provider for generation
+google-genai
+
+# Environment variable management
+python-dotenv
+
+# Web Chatbot Interface (for Phase 5)
+streamlit

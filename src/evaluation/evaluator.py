@@ -42,7 +42,7 @@ def evaluate_pipeline(
     pipeline: RAGPipeline,
     questions: List[Dict[str, str]],
     delay_seconds: float = 1.0,
-    top_k: int = 3
+    top_k: int = 5
 ) -> List[Dict[str, Any]]:
     """
     Runs each evaluation question through the unified RAGPipeline and records answers

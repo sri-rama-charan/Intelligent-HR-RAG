@@ -29,7 +29,7 @@ class RAGResponse:
     sources: List[Dict[str, Any]] = field(default_factory=list)
     retrieved_chunks: List[Dict[str, Any]] = field(default_factory=list)
     model: str = ""
-    top_k: int = 3
+    top_k: int = 5
 
 
 class RAGPipeline:
@@ -44,7 +44,7 @@ class RAGPipeline:
         embedder: Optional[EmbeddingManager] = None,
         vector_store: Optional[FAISSVectorStore] = None,
         generator: Optional[GeminiGenerator] = None,
-        top_k: int = 3
+        top_k: int = 5
     ):
         """
         Initializes the unified pipeline using dependency injection.
@@ -53,7 +53,7 @@ class RAGPipeline:
             embedder (Optional[EmbeddingManager]): Embedding component.
             vector_store (Optional[FAISSVectorStore]): FAISS vector store.
             generator (Optional[GeminiGenerator]): Gemini LLM generator.
-            top_k (int): Number of relevant chunks to retrieve (default: 3).
+            top_k (int): Number of relevant chunks to retrieve (default: 5).
         """
         if top_k <= 0:
             raise ValueError(f"top_k must be a positive integer, got {top_k}")
@@ -143,7 +143,7 @@ class RAGPipeline:
         embedding_model: str = DEFAULT_EMBEDDING_MODEL,
         gemini_model: str = DEFAULT_GEMINI_MODEL,
         api_key: Optional[str] = None,
-        top_k: int = 3
+        top_k: int = 5
     ) -> "RAGPipeline":
         """
         Convenience factory: loads the corpus, chunks documents, builds the in-memory

@@ -2,9 +2,9 @@ import csv
 from pathlib import Path
 
 def inspect_eval_data():
-    project_dir = Path(__file__).resolve().parent.parent / "project-2-intelligent-rag"
-    test_csv = project_dir / "test.csv"
-    sample_sub_csv = project_dir / "sample submission.csv"
+    project_root = Path(__file__).resolve().parent.parent
+    test_csv = project_root / "data" / "evaluation" / "test.csv"
+    sample_sub_csv = project_root / "submission" / "sample_submission.csv"
     
     print("=" * 60)
     print("INSPECTING test.csv")

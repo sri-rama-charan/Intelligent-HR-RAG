@@ -84,10 +84,6 @@ def load_all_pdfs(corpus_dir: Optional[Path] = None) -> List[Document]:
         # Default to data/hr_corpus relative to project root
         project_root = Path(__file__).resolve().parent.parent.parent
         corpus_dir = project_root / "data" / "hr_corpus"
-        
-        # Fallback to project-2-intelligent-rag/zyro-dynamics-hr-corpus if data/hr_corpus is missing
-        if not corpus_dir.exists():
-            corpus_dir = project_root / "project-2-intelligent-rag" / "zyro-dynamics-hr-corpus"
 
     if not corpus_dir.exists():
         raise FileNotFoundError(f"Corpus directory not found at: {corpus_dir}")

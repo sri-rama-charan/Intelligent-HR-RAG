@@ -57,6 +57,6 @@ if __name__ == "__main__":
     # Path to the HR corpus directory
     current_dir = Path(__file__).resolve().parent
     workspace_root = current_dir.parent
-    corpus_directory = workspace_root / "project-2-intelligent-rag" / "zyro-dynamics-hr-corpus"
+    corpus_directory = workspace_root / "data" / "hr_corpus"
     
     inspect_corpus(corpus_directory)

@@ -20,8 +20,6 @@ class TestEmbeddings(unittest.TestCase):
         # Locate project root and load a small subset or full corpus
         cls.project_root = Path(__file__).resolve().parent.parent
         corpus_dir = cls.project_root / "data" / "hr_corpus"
-        if not corpus_dir.exists():
-            corpus_dir = cls.project_root / "project-2-intelligent-rag" / "zyro-dynamics-hr-corpus"
         
         pages = load_all_pdfs(corpus_dir)
         cls.chunks = chunk_documents(pages, chunk_size=800, chunk_overlap=100)

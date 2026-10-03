@@ -16,8 +16,6 @@ class TestIngestion(unittest.TestCase):
         # Locate project root and corpus directory
         cls.project_root = Path(__file__).resolve().parent.parent
         cls.corpus_dir = cls.project_root / "data" / "hr_corpus"
-        if not cls.corpus_dir.exists():
-            cls.corpus_dir = cls.project_root / "project-2-intelligent-rag" / "zyro-dynamics-hr-corpus"
         
         # Load pages and create chunks once for tests
         cls.pages = load_all_pdfs(cls.corpus_dir)

@@ -30,6 +30,7 @@ class RAGResponse:
     retrieved_chunks: List[Dict[str, Any]] = field(default_factory=list)
     model: str = ""
     top_k: int = 5
+    retrieval_mode: str = "faiss"
 
 
 class RAGPipeline:
@@ -44,6 +45,8 @@ class RAGPipeline:
         embedder: Optional[EmbeddingManager] = None,
         vector_store: Optional[FAISSVectorStore] = None,
         generator: Optional[GeminiGenerator] = None,
+        retriever: Optional[Any] = None,
+        retrieval_mode: str = "faiss",
         top_k: int = 5
     ):
         """
@@ -53,27 +56,33 @@ class RAGPipeline:
             embedder (Optional[EmbeddingManager]): Embedding component.
             vector_store (Optional[FAISSVectorStore]): FAISS vector store.
             generator (Optional[GeminiGenerator]): Gemini LLM generator.
+            retriever (Optional[Any]): Custom or hybrid retriever instance (e.g. HybridRetriever).
+            retrieval_mode (str): Retrieval mode: 'faiss' (default) or 'hybrid'.
             top_k (int): Number of relevant chunks to retrieve (default: 5).
         """
         if top_k <= 0:
             raise ValueError(f"top_k must be a positive integer, got {top_k}")
+        if retrieval_mode not in ("faiss", "hybrid"):
+            raise ValueError(f"Unsupported retrieval_mode '{retrieval_mode}'. Must be 'faiss' or 'hybrid'.")
 
         self.embedder = embedder
         self.vector_store = vector_store
         self.generator = generator
+        self.retriever = retriever
+        self.retrieval_mode = retrieval_mode
         self.top_k = top_k
 
     def ask(self, question: str, top_k: Optional[int] = None) -> RAGResponse:
         """
         Answers a user question through the complete RAG lifecycle:
-          Validate question -> Embed -> FAISS Retrieve -> Ground Prompt -> Generate Answer.
+          Validate question -> Retrieve (FAISS or Hybrid) -> Ground Prompt -> Generate Answer.
 
         Args:
             question (str): The employee's question.
             top_k (Optional[int]): Override default Top-K if provided.
 
         Returns:
-            RAGResponse: Structured result with answer, citations, and debug chunks.
+            RAGResponse: Structured result with answer, citations, debug chunks, and retrieval_mode.
         """
         # 1. Question Validation
         if question is None:
@@ -82,20 +91,25 @@ class RAGPipeline:
         if not cleaned_question:
             raise ValueError("Question cannot be empty or whitespace only.")
 
-        # Ensure components are configured
-        if self.embedder is None:
-            raise RuntimeError("Pipeline embedder is not initialized.")
-        if self.vector_store is None:
-            raise RuntimeError("Pipeline vector_store is not initialized.")
+        # Ensure generator is configured
         if self.generator is None:
             raise RuntimeError("Pipeline generator is not initialized.")
 
         k = top_k if (top_k is not None and top_k > 0) else self.top_k
 
-        # 2. Embedding & Retrieval Stage
+        # 2. Retrieval Stage (FAISS or Hybrid)
         try:
-            query_vector = self.embedder.embed_query(cleaned_question, normalize=True)
-            retrieved_chunks = self.vector_store.search(query_vector, top_k=k)
+            if self.retrieval_mode == "hybrid":
+                if self.retriever is None:
+                    raise RuntimeError("Pipeline retriever is not initialized for hybrid mode.")
+                retrieved_chunks = self.retriever.search(cleaned_question, top_k=k)
+            else:  # "faiss" mode
+                if self.embedder is None:
+                    raise RuntimeError("Pipeline embedder is not initialized.")
+                if self.vector_store is None:
+                    raise RuntimeError("Pipeline vector_store is not initialized.")
+                query_vector = self.embedder.embed_query(cleaned_question, normalize=True)
+                retrieved_chunks = self.vector_store.search(query_vector, top_k=k)
         except Exception as e:
             raise RuntimeError(f"Retrieval stage failed: {e}") from e
 
@@ -115,7 +129,8 @@ class RAGPipeline:
             sources=unique_sources,
             retrieved_chunks=retrieved_chunks,
             model=getattr(self.generator, "model_name", "unknown"),
-            top_k=k
+            top_k=k,
+            retrieval_mode=self.retrieval_mode
         )
 
     @staticmethod
@@ -143,12 +158,16 @@ class RAGPipeline:
         embedding_model: str = DEFAULT_EMBEDDING_MODEL,
         gemini_model: str = DEFAULT_GEMINI_MODEL,
         api_key: Optional[str] = None,
+        retrieval_mode: str = "faiss",
         top_k: int = 5
     ) -> "RAGPipeline":
         """
         Convenience factory: loads the corpus, chunks documents, builds the in-memory
-        FAISS index, initializes GeminiGenerator, and returns a ready-to-use RAGPipeline.
+        retrieval backend (FAISS or Hybrid), initializes GeminiGenerator, and returns a ready-to-use RAGPipeline.
         """
+        if retrieval_mode not in ("faiss", "hybrid"):
+            raise ValueError(f"Unsupported retrieval_mode '{retrieval_mode}'. Must be 'faiss' or 'hybrid'.")
+
         pages = load_all_pdfs(corpus_dir)
         chunks = chunk_documents(pages, chunk_size=800, chunk_overlap=100)
 
@@ -156,9 +175,24 @@ class RAGPipeline:
         vector_store = FAISSVectorStore.build_from_chunks(chunks, embedder)
         generator = GeminiGenerator(api_key=api_key, model_name=gemini_model)
 
+        retriever = None
+        if retrieval_mode == "hybrid":
+            from src.retrieval.bm25_store import BM25Store
+            from src.retrieval.hybrid_retriever import HybridRetriever
+            bm25_store = BM25Store.build_from_chunks(chunks)
+            retriever = HybridRetriever(
+                vector_store=vector_store,
+                bm25_store=bm25_store,
+                embedder=embedder,
+                rrf_k=60,
+                default_top_k=top_k
+            )
+
         return cls(
             embedder=embedder,
             vector_store=vector_store,
             generator=generator,
+            retriever=retriever,
+            retrieval_mode=retrieval_mode,
             top_k=top_k
         )

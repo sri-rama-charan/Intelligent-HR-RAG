@@ -7,6 +7,9 @@ sentence-transformers
 # Vector search index for retrieving relevant chunks
 faiss-cpu
 
+# Lexical search index for BM25 hybrid retrieval
+rank-bm25
+
 # Orchestration and chunking utilities
 langchain
 langchain-community

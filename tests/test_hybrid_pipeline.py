@@ -303,6 +303,76 @@ class TestHybridPipeline(unittest.TestCase):
             default_top_k=5
         )
 
+    # --- E. Hybrid + Reranker Mode Tests ---
+
+    def test_hybrid_rerank_mode_fetches_pool_and_reduces_to_top_k(self):
+        """In hybrid_rerank mode, retriever gets candidate_pool_size (20), and reranker reduces to top_k (5)."""
+        mock_reranker = MagicMock()
+        reranked_chunks = self.mock_hybrid_chunks[:2]
+        mock_reranker.rerank.return_value = reranked_chunks
+
+        pipeline = RAGPipeline(
+            generator=self.mock_generator,
+            retriever=self.mock_hybrid_retriever,
+            reranker=mock_reranker,
+            retrieval_mode="hybrid_rerank",
+            top_k=2,
+            candidate_pool_size=20
+        )
+
+        question = "Can I work from home?"
+        response = pipeline.ask(question)
+
+        # 1. Retriever fetched candidate pool of size 20
+        self.mock_hybrid_retriever.search.assert_called_once_with(question, top_k=20)
+        # 2. Reranker received the candidates and reduced to top_k=2
+        mock_reranker.rerank.assert_called_once_with(question, self.mock_hybrid_chunks, top_k=2)
+        # 3. Generator received only the reranked chunks (2, not 20)
+        self.mock_generator.generate.assert_called_once_with(question, reranked_chunks)
+        # 4. Response metadata reflects hybrid_rerank
+        self.assertEqual(response.retrieval_mode, "hybrid_rerank")
+        self.assertEqual(len(response.retrieved_chunks), 2)
+
+    def test_hybrid_rerank_mode_missing_reranker_raises_error(self):
+        """hybrid_rerank mode with reranker=None raises RuntimeError."""
+        pipeline = RAGPipeline(
+            generator=self.mock_generator,
+            retriever=self.mock_hybrid_retriever,
+            reranker=None,
+            retrieval_mode="hybrid_rerank"
+        )
+        with self.assertRaises(RuntimeError) as ctx:
+            pipeline.ask("Question")
+        self.assertIn("reranker is not initialized for hybrid_rerank mode", str(ctx.exception))
+
+    @patch("src.retrieval.reranker.Reranker")
+    @patch("src.retrieval.hybrid_retriever.HybridRetriever")
+    @patch("src.retrieval.bm25_store.BM25Store")
+    @patch("src.pipeline.rag_pipeline.load_all_pdfs")
+    @patch("src.pipeline.rag_pipeline.chunk_documents")
+    @patch("src.pipeline.rag_pipeline.EmbeddingManager")
+    @patch("src.pipeline.rag_pipeline.FAISSVectorStore")
+    @patch("src.pipeline.rag_pipeline.GeminiGenerator")
+    def test_from_corpus_hybrid_rerank_mode(
+        self, mock_gen_cls, mock_vs_cls, mock_emb_cls, mock_chunk, mock_load, mock_bm25_cls, mock_hybrid_cls, mock_rerank_cls
+    ):
+        """from_corpus with retrieval_mode='hybrid_rerank' wires up retriever and reranker."""
+        mock_load.return_value = [{"text": "page1"}]
+        sample_chunks = [{"chunk_id": "c1", "text": "chunk1"}]
+        mock_chunk.return_value = sample_chunks
+
+        pipeline = RAGPipeline.from_corpus(
+            corpus_dir=None,
+            retrieval_mode="hybrid_rerank",
+            top_k=5,
+            candidate_pool_size=20
+        )
+
+        self.assertEqual(pipeline.retrieval_mode, "hybrid_rerank")
+        self.assertIsNotNone(pipeline.retriever)
+        self.assertIsNotNone(pipeline.reranker)
+        mock_rerank_cls.assert_called_once_with(model_name="cross-encoder/ms-marco-MiniLM-L-6-v2")
+
 
 if __name__ == "__main__":
     unittest.main()
